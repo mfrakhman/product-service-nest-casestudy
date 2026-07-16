@@ -1,0 +1,18 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Sku {
+  id    String @id @default(uuid())
+  name  String
+  stock Int
+
+  @@map("skus")
+}
