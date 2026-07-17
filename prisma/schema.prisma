@@ -16,3 +16,11 @@ model Sku {
 
   @@map("skus")
 }
+
+// Receipt row committed atomically with the stock decrements — makes
+// at-least-once redelivery of order.created safe (ARCHITECTURE.md §2).
+model Reservation {
+  orderId String @id @map("order_id")
+
+  @@map("reservations")
+}
