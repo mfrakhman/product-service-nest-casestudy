@@ -9,18 +9,26 @@ datasource db {
   provider = "postgresql"
 }
 
-model Sku {
-  id    String @id @default(uuid())
-  name  String
-  stock Int
+// v3 (ARCHITECTURE.md §7.2) — spec fields: id, name, price, qty, createdAt.
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  price     Decimal  @db.Decimal(12, 2)
+  qty       Int
+  createdAt DateTime @default(now()) @map("created_at")
 
-  @@map("skus")
+  @@map("products")
 }
 
-// Receipt row committed atomically with the stock decrements — makes
-// at-least-once redelivery of order.created safe (ARCHITECTURE.md §2).
-model Reservation {
-  orderId String @id @map("order_id")
+// Redelivery dedup guard for the order.created decrement (ARCHITECTURE.md
+// §7.2) — replaces v2's `reservations`. Narrower job than v2's table: no
+// reply-idempotency duty (no republish-on-retry exists in v3), just "have I
+// already decremented for this orderId". Written only on the success path —
+// a rejection writes no row, same asymmetry v1/v2 used.
+model ProcessedOrder {
+  orderId     String   @id @map("order_id")
+  quantity    Int
+  processedAt DateTime @default(now()) @map("processed_at")
 
-  @@map("reservations")
+  @@map("processed_orders")
 }

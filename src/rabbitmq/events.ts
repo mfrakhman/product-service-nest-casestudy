@@ -1,13 +1,10 @@
-/** Event payloads (ARCHITECTURE.md §4) — shapes shared with order-service. */
-
-export interface OrderItemPayload {
-  skuId: string;
-  quantity: number;
-}
+/** Event payloads (ARCHITECTURE.md §7.3) — shapes shared with order-service. */
 
 export interface OrderCreatedEvent {
   orderId: string;
-  items: OrderItemPayload[];
+  productId: string;
+  quantity: number;
+  totalPrice: number;
   createdAt: string;
 }
 

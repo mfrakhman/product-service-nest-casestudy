@@ -57,10 +57,18 @@ export class RabbitmqConsumer implements OnModuleInit, OnModuleDestroy {
   private async handleOrderCreated(msg: amqplib.ConsumeMessage) {
     try {
       const event = JSON.parse(msg.content.toString()) as OrderCreatedEvent;
-      const outcome = await this.productsService.reserveForOrder(
+      const outcome = await this.productsService.decrement(
         event.orderId,
-        event.items,
+        event.productId,
+        event.quantity,
       );
+
+      if (outcome === undefined) {
+        // redelivery of an already-processed orderId (§7.2 dedup guard) — a
+        // prior attempt already published the reply, nothing left to do
+        this.channel?.ack(msg);
+        return;
+      }
 
       const reply: StockReplyEvent = outcome.reserved
         ? { orderId: event.orderId }
@@ -68,13 +76,15 @@ export class RabbitmqConsumer implements OnModuleInit, OnModuleDestroy {
       const routingKey = outcome.reserved ? RK_STOCK_RESERVED : RK_STOCK_REJECTED;
 
       // ack only after the broker confirms the reply — a crash in between
-      // redelivers order.created, which the reservations receipt row makes safe
+      // redelivers order.created, which the processedOrder dedup guard makes safe
       await this.publisher.publish(routingKey, reply);
       this.channel?.ack(msg);
     } catch (error) {
       const err = error as Error;
       this.logger.error(`order.created processing failed: ${err.message}`, err.stack);
       // unexpected failure → ordering.dlx → ordering.dead-letter (audit: depth 0)
+      // — deliberately no connectivity-vs-poison classification (ARCHITECTURE.md
+      // §7.5 discussion 2026-07-21): keeps one code path, keeps DLQ depth==0 sharp
       this.channel?.nack(msg, false, false);
     }
   }
